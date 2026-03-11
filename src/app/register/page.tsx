@@ -4,123 +4,127 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+const fieldStyle = {
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  color: "#F1F5F9",
+  fontSize: "14px",
+} as React.CSSProperties;
+
+function Field({
+  label, type = "text", value, onChange, placeholder, autoFocus, minLength,
+}: {
+  label: string; type?: string; value: string;
+  onChange: (v: string) => void; placeholder: string;
+  autoFocus?: boolean; minLength?: number;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: "#64748B" }}>
+        {label}
+      </label>
+      <input
+        type={type} value={value} onChange={(e) => onChange(e.target.value)}
+        required autoFocus={autoFocus} minLength={minLength} placeholder={placeholder}
+        className="w-full px-4 py-3 rounded-xl outline-none transition-all duration-150"
+        style={fieldStyle}
+        onFocus={(e) => { e.target.style.borderColor = "rgba(59,130,246,0.5)"; e.target.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.08)"; }}
+        onBlur={(e)  => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
+      />
+    </div>
+  );
+}
+
 export default function RegisterPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name,     setName]     = useState("");
+  const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error,    setError]    = useState("");
+  const [loading,  setLoading]  = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res  = await fetch("/api/auth/register", {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
       });
-
       const data = await res.json();
-
       if (data.success) {
-        // Auto-login after registration
-        const loginRes = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const loginRes  = await fetch("/api/auth/login", {
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-
         const loginData = await loginRes.json();
-        if (loginData.success) {
-          router.push("/admin");
-          router.refresh();
-        } else {
-          router.push("/login");
-        }
-      } else {
-        setError(data.message || "Error al registrarse");
-      }
-    } catch {
-      setError("Error de conexión");
-    } finally {
-      setLoading(false);
-    }
+        if (loginData.success) { router.push("/admin"); router.refresh(); }
+        else router.push("/login");
+      } else { setError(data.message || "Error al registrarse"); }
+    } catch { setError("Error de conexion. Intenta de nuevo."); } finally { setLoading(false); }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ background: "#080C14" }}>
+      {/* Background */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        <div className="absolute" style={{ width: "600px", height: "600px", top: "-100px", right: "-100px", background: "radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)", borderRadius: "50%" }} />
+        <div className="absolute" style={{ width: "500px", height: "500px", bottom: "-80px", left: "-80px",  background: "radial-gradient(circle, rgba(59,130,246,0.07)  0%, transparent 70%)", borderRadius: "50%" }} />
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+      </div>
+
+      <div className="w-full max-w-[380px] animate-fade-in relative z-10">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-lg font-bold">SE</span>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl mb-5" style={{ background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)" }}>
+            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none">
+              <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Crear cuenta</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Configura tu tienda COD</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white" style={{ letterSpacing: "-0.02em" }}>
+            Crea tu cuenta
+          </h1>
+          <p className="text-sm mt-1.5" style={{ color: "#64748B" }}>Configura tu tienda COD en minutos</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+        {/* Card */}
+        <div className="rounded-2xl p-7" style={{ background: "rgba(17,24,39,0.8)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(20px)", boxShadow: "0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset" }}>
           {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg">
+            <div className="flex items-center gap-3 p-3.5 rounded-xl mb-5 text-sm animate-scale-in" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#FCA5A5" }}>
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
               {error}
             </div>
           )}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Field label="Nombre"      value={name}     onChange={setName}     placeholder="Tu nombre"        autoFocus />
+            <Field label="Email"       type="email"  value={email}    onChange={setEmail}    placeholder="tu@email.com" />
+            <Field label="Contraseña"  type="password" value={password} onChange={setPassword} placeholder="Minimo 8 caracteres" minLength={8} />
+            <button
+              type="submit" disabled={loading}
+              className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: loading ? "#2563EB" : "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)", boxShadow: loading ? "none" : "0 4px 14px rgba(59,130,246,0.35)" }}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  Creando cuenta...
+                </span>
+              ) : "Crear cuenta gratis"}
+            </button>
+          </form>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoFocus
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Tu nombre"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="tu@email.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Mínimo 8 caracteres"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {loading ? "Creando..." : "Crear cuenta"}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
+        <p className="text-center text-sm mt-5" style={{ color: "#475569" }}>
           ¿Ya tienes cuenta?{" "}
-          <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
-            Inicia sesión
+          <Link href="/login" className="font-medium transition-colors" style={{ color: "#3B82F6" }}>
+            Inicia sesion
           </Link>
+        </p>
+        <p className="text-center text-[11px] mt-6" style={{ color: "#2D3F55" }}>
+          Shopify Esteroides · Panel Administrativo
         </p>
       </div>
     </div>
