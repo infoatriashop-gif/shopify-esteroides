@@ -13,3 +13,7 @@ env:
     secret: JWT_SECRET
   - variable: NEXT_PUBLIC_APP_URL
     value: https://shopify-esteroides--shopify-esteroides-2026.us-central1.hosted.app
+  - variable: DROPI_API_KEY
+    secret: DROPI_API_KEY
+  - variable: DROPI_COUNTRY_CODE
+    value: CO

@@ -64,7 +64,15 @@ export type DropiLogEntry = {
 
 async function getSettings(): Promise<DropiSettings> {
   const allSettings = await readStore<Record<string, DropiSettings>>("settings", {} as Record<string, DropiSettings>);
-  return allSettings.dropi || { enabled: false, environment: "production", apiKey: "", autoSync: true, countryCode: "CO" };
+  const saved = allSettings.dropi || {};
+  // Fallback a variables de entorno si no hay settings guardados (Firebase serverless)
+  return {
+    enabled: saved.enabled ?? true,
+    environment: saved.environment || "production",
+    apiKey: saved.apiKey || process.env.DROPI_API_KEY || "",
+    autoSync: saved.autoSync ?? true,
+    countryCode: saved.countryCode || process.env.DROPI_COUNTRY_CODE || "CO",
+  };
 }
 
 function getBaseUrl(settings: DropiSettings): string {
