@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Fix workspace root detection - prevent Next.js from using parent lockfiles
-  turbopack: {
-    root: process.cwd(),
-  },
   // Allow any custom domain to reach the app
   // In production, configure your reverse proxy (Railway, Vercel, etc.)
   // to route the custom domain to this app
