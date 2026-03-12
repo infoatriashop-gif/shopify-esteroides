@@ -21,3 +21,7 @@ env:
     secret: WC_CONSUMER_KEY
   - variable: WC_CONSUMER_SECRET
     secret: WC_CONSUMER_SECRET
+  - variable: DROPI_EMAIL
+    secret: DROPI_EMAIL
+  - variable: DROPI_PASSWORD
+    secret: DROPI_PASSWORD

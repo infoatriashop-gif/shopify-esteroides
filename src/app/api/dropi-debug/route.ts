@@ -2,67 +2,78 @@ import { NextResponse } from "next/server";
 
 const BASE = "https://api.dropi.co/integrations";
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const email = url.searchParams.get("email") || "";
-  const password = url.searchParams.get("password") || "";
+export async function GET() {
+  const email = process.env.DROPI_EMAIL || "";
+  const password = process.env.DROPI_PASSWORD || "";
 
-  const results: Record<string, unknown> = {};
+  const results: Record<string, unknown> = {
+    hasCredentials: !!(email && password),
+  };
 
-  // Test 1: Login con email/password
-  if (email && password) {
-    try {
-      const r = await fetch(`${BASE}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json;charset=UTF-8" },
-        body: JSON.stringify({ email, password, white_brand_id: 1 }),
-      });
-      const text = await r.text();
-      results.login = { status: r.status, body: text.slice(0, 500) };
+  if (!email || !password) {
+    results.error = "DROPI_EMAIL o DROPI_PASSWORD no configurados";
+    return NextResponse.json(results);
+  }
 
-      // Si el login funciona, intentar llamar products con el Bearer token
-      if (r.status === 200) {
-        try {
-          const data = JSON.parse(text);
-          const bearerToken = data.access_token || data.token || data.objects?.access_token || data.objects?.token;
-          if (bearerToken) {
-            results.bearer_token = `${String(bearerToken).slice(0, 30)}...`;
+  // Step 1: Login
+  try {
+    const r = await fetch(`${BASE}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      body: JSON.stringify({ email, password, white_brand_id: 1 }),
+    });
+    const data = await r.json();
+    results.login_status = r.status;
+    results.login_success = data.isSuccess;
+    results.login_message = data.message;
 
-            // Test products con Bearer
-            const r2 = await fetch(`${BASE}/products/index`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json;charset=UTF-8",
-                "Authorization": `Bearer ${bearerToken}`,
-              },
-              body: JSON.stringify({ page: 1, perpage: 1 }),
-            });
-            const t2 = await r2.text();
-            results.products_bearer = { status: r2.status, body: t2.slice(0, 500) };
-
-            // Test products con dropi-integration-key usando el token del login
-            const r3 = await fetch(`${BASE}/products/index`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json;charset=UTF-8",
-                "dropi-integration-key": bearerToken,
-              },
-              body: JSON.stringify({ page: 1, perpage: 1 }),
-            });
-            const t3 = await r3.text();
-            results.products_integration_key = { status: r3.status, body: t3.slice(0, 500) };
-          } else {
-            results.bearer_token = "No token found in response";
-          }
-        } catch {
-          results.parse_error = "Could not parse login response";
-        }
-      }
-    } catch (e) {
-      results.login = { error: String(e) };
+    if (!data.isSuccess) {
+      return NextResponse.json(results);
     }
-  } else {
-    results.usage = "Agrega ?email=TU_EMAIL&password=TU_PASSWORD a la URL";
+
+    // Extract token
+    const token = data.access_token || data.token || data.objects?.access_token || data.objects?.token || data.objects;
+    results.token_type = typeof token;
+    results.token_preview = typeof token === "string" ? `${token.slice(0, 30)}...` : JSON.stringify(token).slice(0, 200);
+
+    if (typeof token !== "string") {
+      return NextResponse.json(results);
+    }
+
+    // Step 2: Test products with Bearer
+    const r2 = await fetch(`${BASE}/products/index`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json;charset=UTF-8",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ startData: 0, pageSize: 1, order_type: "desc", order_by: "id", active: true, no_count: true, integration: true, get_stock: false, userVerified: true, stockmayor: 1 }),
+    });
+    const d2 = await r2.json();
+    results.products_bearer = {
+      status: r2.status,
+      success: d2.isSuccess,
+      count: Array.isArray(d2.objects) ? d2.objects.length : 0,
+      firstProduct: Array.isArray(d2.objects) && d2.objects[0] ? { id: d2.objects[0].id, name: d2.objects[0].name } : null,
+    };
+
+    // Step 3: Test products with dropi-integration-key
+    const r3 = await fetch(`${BASE}/products/index`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json;charset=UTF-8",
+        "dropi-integration-key": token,
+      },
+      body: JSON.stringify({ startData: 0, pageSize: 1, order_type: "desc", order_by: "id", active: true, no_count: true, integration: true, get_stock: false, userVerified: true, stockmayor: 1 }),
+    });
+    const d3 = await r3.json();
+    results.products_integration_key = {
+      status: r3.status,
+      success: d3.isSuccess,
+    };
+
+  } catch (e) {
+    results.error = String(e);
   }
 
   return NextResponse.json(results);
