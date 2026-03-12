@@ -201,6 +201,7 @@ export async function sendOrderToDropi(order: {
   notes: string;
   productName: string;
   productId: number;
+  dropiProductId?: number | null; // ID real del producto en Dropi
   quantity: number;
   total: number;
   countryCode?: string;
@@ -230,7 +231,7 @@ export async function sendOrderToDropi(order: {
     type: "FINAL_ORDER",
     rate_type: "CON RECAUDO",
     products: [{
-      id: order.productId,
+      id: order.dropiProductId || order.productId,
       name: order.productName,
       quantity: order.quantity,
       stock: 100,

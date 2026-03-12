@@ -77,6 +77,7 @@ export async function PUT(req: Request, { params }: { params: Params }) {
       "metaTitle",
       "metaDescription",
       "country",
+      "dropiProductId",
     ] as const;
 
     for (const field of allowedFields) {

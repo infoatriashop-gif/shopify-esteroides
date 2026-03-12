@@ -13,9 +13,16 @@ export default function ProductosPage() {
   const [products, setProducts]   = useState<Product[]>([]);
   const [loading,  setLoading]    = useState(true);
   const [showForm, setShowForm]   = useState(false);
-  const [formData, setFormData]   = useState({ name: "", price: "", stock: "", description: "" });
+  const [formData, setFormData]   = useState({ name: "", price: "", stock: "", description: "", dropiProductId: "" });
   const [saving,   setSaving]     = useState(false);
   const [deleting, setDeleting]   = useState<number | null>(null);
+
+  // Import from Dropi
+  const [showImport, setShowImport]     = useState(false);
+  const [importId, setImportId]         = useState("");
+  const [importData, setImportData]     = useState<Record<string, string>>({ name: "", price: "", description: "" });
+  const [importing, setImporting]       = useState(false);
+  const [importMsg, setImportMsg]       = useState("");
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -35,14 +42,42 @@ export default function ProductosPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          name:        formData.name,
-          price:       parseInt(formData.price),
-          stock:       parseInt(formData.stock) || 100,
-          description: formData.description,
+          name:           formData.name,
+          price:          parseInt(formData.price),
+          stock:          parseInt(formData.stock) || 100,
+          description:    formData.description,
+          dropiProductId: formData.dropiProductId ? parseInt(formData.dropiProductId) : null,
         }),
       });
-      if (res.ok) { setFormData({ name: "", price: "", stock: "", description: "" }); setShowForm(false); fetchProducts(); }
+      if (res.ok) { setFormData({ name: "", price: "", stock: "", description: "", dropiProductId: "" }); setShowForm(false); fetchProducts(); }
     } finally { setSaving(false); }
+  }
+
+  async function handleImport() {
+    if (!importId) { setImportMsg("Ingresa el ID del producto en Dropi."); return; }
+    setImporting(true); setImportMsg("");
+    try {
+      const res = await fetch("/api/dropi/import-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dropiProductId: parseInt(importId),
+          name: importData.name || undefined,
+          price: importData.price ? parseInt(importData.price) : undefined,
+          description: importData.description || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportMsg("Producto importado correctamente.");
+        setImportId(""); setImportData({ name: "", price: "", description: "" });
+        fetchProducts();
+        setTimeout(() => { setShowImport(false); setImportMsg(""); }, 1500);
+      } else {
+        setImportMsg(data.error || "Error al importar.");
+      }
+    } catch { setImportMsg("Error de conexión."); }
+    finally { setImporting(false); }
   }
 
   async function toggleActive(product: Product) {
@@ -89,6 +124,16 @@ export default function ProductosPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setShowImport(!showImport); setImportMsg(""); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer"
+            style={{ background: "rgba(245,158,11,0.1)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.2)" }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Importar de Dropi
+          </button>
           <Link
             href="/admin/productos/nuevo"
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer"
@@ -130,6 +175,39 @@ export default function ProductosPage() {
         </div>
       </div>
 
+      {/* Import from Dropi */}
+      {showImport && (
+        <div className="rounded-2xl p-6 animate-scale-in" style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}>
+          <h3 className="font-semibold text-sm mb-1" style={{ color: "var(--color-foreground)" }}>Importar Producto de Dropi</h3>
+          <p className="text-xs mb-4" style={{ color: "var(--color-muted)" }}>Ingresa el ID del producto en Dropi. Puedes encontrarlo en Dropi → Productos → columna ID.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>ID Dropi *</label>
+              <input type="number" value={importId} onChange={(e) => setImportId(e.target.value)} placeholder="Ej: 284519" className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>Nombre (opcional)</label>
+              <input value={importData.name} onChange={(e) => setImportData({ ...importData, name: e.target.value })} placeholder="Se usará ID si vacío" className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>Precio COP (opcional)</label>
+              <input type="number" value={importData.price} onChange={(e) => setImportData({ ...importData, price: e.target.value })} placeholder="0" className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>Descripción (opcional)</label>
+              <input value={importData.description} onChange={(e) => setImportData({ ...importData, description: e.target.value })} placeholder="Breve descripción" className={inputCls} />
+            </div>
+          </div>
+          {importMsg && <p className={`text-sm mt-3 font-medium ${importMsg.includes("Error") || importMsg.includes("Ya existe") ? "text-red-500" : "text-green-500"}`}>{importMsg}</p>}
+          <div className="mt-5 flex gap-2">
+            <button onClick={handleImport} disabled={importing || !importId} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-150 cursor-pointer disabled:opacity-50" style={{ background: "#F59E0B" }}>
+              {importing ? "Importando..." : "Importar Producto"}
+            </button>
+            <button onClick={() => setShowImport(false)} className="px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "var(--color-border)", color: "var(--color-muted)" }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
       {/* Add form */}
       {showForm && (
         <div
@@ -141,10 +219,11 @@ export default function ProductosPage() {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { label: "Nombre *",       key: "name",        type: "text",   placeholder: "Crema Facial Premium" },
-              { label: "Precio (COP) *", key: "price",       type: "number", placeholder: "89000" },
-              { label: "Stock",          key: "stock",       type: "number", placeholder: "100" },
-              { label: "Descripcion",    key: "description", type: "text",   placeholder: "Descripcion corta del producto" },
+              { label: "Nombre *",       key: "name",           type: "text",   placeholder: "Crema Facial Premium" },
+              { label: "Precio (COP) *", key: "price",          type: "number", placeholder: "89000" },
+              { label: "Stock",          key: "stock",          type: "number", placeholder: "100" },
+              { label: "ID Dropi",       key: "dropiProductId", type: "number", placeholder: "ID del producto en Dropi" },
+              { label: "Descripcion",    key: "description",    type: "text",   placeholder: "Descripcion corta del producto" },
             ].map((f) => (
               <div key={f.key}>
                 <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>
@@ -256,7 +335,7 @@ export default function ProductosPage() {
                           {product.name}
                         </p>
                         <p className="text-[11px] font-mono truncate" style={{ color: "var(--color-muted)" }}>
-                          /product/{product.slug}
+                          {product.dropiProductId ? `Dropi #${product.dropiProductId}` : `/product/${product.slug}`}
                         </p>
                       </div>
                     </div>

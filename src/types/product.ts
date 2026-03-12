@@ -1,5 +1,6 @@
 export type Product = {
   id: number;
+  dropiProductId?: number | null; // ID del producto en Dropi — necesario para sincronizar pedidos
   name: string;
   slug: string;
   description: string;

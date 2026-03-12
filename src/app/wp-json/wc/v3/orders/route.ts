@@ -54,7 +54,7 @@ function toWcOrder(o: Order) {
       {
         id: o.id,
         name: o.productName,
-        product_id: o.productId,
+        product_id: (o as unknown as Record<string, unknown>).dropiProductId || o.productId,
         quantity: o.quantity,
         total: String(o.total),
         price: o.quantity > 0 ? Math.round(o.total / o.quantity) : o.total,

@@ -100,6 +100,7 @@ export async function POST(req: Request) {
   const now = new Date().toISOString();
   const product: Product = {
     id: nextId(products),
+    dropiProductId: body.dropiProductId ? Number(body.dropiProductId) : null,
     name: body.name,
     slug,
     description: body.description || "",
