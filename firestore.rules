@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Solo acceso desde firebase-admin (server-side)
+    // Bloquea todo acceso directo desde el cliente
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -3,6 +3,7 @@ import { join } from "path";
 import { hasDatabase, getDb } from "@/lib/db";
 import { kvStore } from "@/lib/db/schema/settings";
 import { eq } from "drizzle-orm";
+import { getFirestoreDb, hasFirestore } from "@/lib/firebase-admin";
 
 const DATA_DIR = join(process.cwd(), ".data");
 
@@ -37,13 +38,43 @@ function writeJson<T>(name: string, data: T): void {
   writeFileSync(filePath(name), JSON.stringify(data, null, 2));
 }
 
-// ─── Async KV Store (PostgreSQL + JSON fallback) ────────────────────
+// ─── Firestore helpers ──────────────────────────────────────────────
+
+const FIRESTORE_COLLECTION = "kv_store";
+
+async function readFirestore<T>(name: string, defaultValue: T): Promise<T> {
+  const db = getFirestoreDb();
+  const doc = await db.collection(FIRESTORE_COLLECTION).doc(name).get();
+  if (!doc.exists) return defaultValue;
+  const data = doc.data();
+  return (data?.value ?? defaultValue) as T;
+}
+
+async function writeFirestore<T>(name: string, data: T): Promise<void> {
+  const db = getFirestoreDb();
+  await db.collection(FIRESTORE_COLLECTION).doc(name).set({
+    value: data,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+// ─── Async KV Store (Firestore > PostgreSQL > JSON fallback) ────────
 
 /**
  * Read a value from the KV store.
- * Uses PostgreSQL when DATABASE_URL is set, JSON files otherwise.
+ * Priority: Firestore → PostgreSQL → JSON files
  */
 export async function readStore<T>(name: string, defaultValue: T): Promise<T> {
+  // 1. Firestore (Firebase native — works on App Hosting)
+  if (hasFirestore()) {
+    try {
+      return await readFirestore(name, defaultValue);
+    } catch {
+      // Fall through to next option
+    }
+  }
+
+  // 2. PostgreSQL (if DATABASE_URL is set)
   if (hasDatabase()) {
     const db = getDb();
     const [row] = await db
@@ -53,14 +84,27 @@ export async function readStore<T>(name: string, defaultValue: T): Promise<T> {
     if (!row) return defaultValue;
     return row.value as T;
   }
+
+  // 3. JSON files (local dev fallback)
   return readJson(name, defaultValue);
 }
 
 /**
  * Write a value to the KV store.
- * Uses PostgreSQL when DATABASE_URL is set, JSON files otherwise.
+ * Priority: Firestore → PostgreSQL → JSON files
  */
 export async function writeStore<T>(name: string, data: T): Promise<void> {
+  // 1. Firestore
+  if (hasFirestore()) {
+    try {
+      await writeFirestore(name, data);
+      return;
+    } catch {
+      // Fall through
+    }
+  }
+
+  // 2. PostgreSQL
   if (hasDatabase()) {
     const db = getDb();
     await db
@@ -79,6 +123,8 @@ export async function writeStore<T>(name: string, data: T): Promise<void> {
       });
     return;
   }
+
+  // 3. JSON files
   writeJson(name, data);
 }
 
