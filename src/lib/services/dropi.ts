@@ -164,14 +164,15 @@ export async function testConnection(settings?: DropiSettings): Promise<{
     const config = settings || await getSettings();
     if (!config.apiKey) return { success: false, message: "No hay API Key configurada" };
 
-    const res = await dropiRequest("/warehouses/", "GET", undefined, config);
+    const res = await dropiRequest("/products/index", "POST", { page: 1, perpage: 1 }, config);
 
     if (res.isSuccess) {
       return { success: true, message: "Conexión exitosa con Dropi", userInfo: res.objects };
     }
 
     if (res.statusCode === 401) {
-      return { success: false, message: "Token inválido o IP no autorizada. Verifica tu IP en el panel de Dropi." };
+      const ipInfo = (res as unknown as Record<string, string>).ip ? ` IP del servidor: ${(res as unknown as Record<string, string>).ip}` : "";
+      return { success: false, message: `Integration Key inválida o acceso denegado.${ipInfo} Verifica que la key sea correcta en Dropi → Mis Integraciones.` };
     }
 
     return { success: false, message: res.message || "Error de autenticación con Dropi" };
