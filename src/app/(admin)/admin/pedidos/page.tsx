@@ -18,6 +18,22 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string 
 const inputCls =
   "w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-150 border bg-[var(--color-surface)] text-[var(--color-foreground)] border-[var(--color-border)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 placeholder-[var(--color-muted)]";
 
+type Product = { id: number; name: string; price: number; slug: string };
+
+const EMPTY_FORM = {
+  productId: "",
+  productName: "",
+  quantity: "1",
+  customerName: "",
+  customerPhone: "",
+  customerEmail: "",
+  department: "",
+  city: "",
+  address: "",
+  notes: "",
+  total: "",
+};
+
 export default function PedidosPage() {
   const [orders, setOrders]               = useState<Order[]>([]);
   const [loading, setLoading]             = useState(true);
@@ -28,6 +44,13 @@ export default function PedidosPage() {
   const [syncing, setSyncing]             = useState<number | null>(null);
   const [retrying, setRetrying]           = useState(false);
 
+  // New order modal
+  const [showNew, setShowNew]     = useState(false);
+  const [products, setProducts]   = useState<Product[]>([]);
+  const [form, setForm]           = useState(EMPTY_FORM);
+  const [creating, setCreating]   = useState(false);
+  const [createErr, setCreateErr] = useState("");
+
   const fetchOrders = useCallback(() => {
     fetch("/api/orders")
       .then((r) => r.json())
@@ -37,6 +60,62 @@ export default function PedidosPage() {
   }, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  useEffect(() => {
+    if (showNew && products.length === 0) {
+      fetch("/api/products").then((r) => r.json()).then(setProducts).catch(() => {});
+    }
+  }, [showNew, products.length]);
+
+  const handleProductSelect = (id: string) => {
+    const p = products.find((x) => String(x.id) === id);
+    if (!p) { setForm((f) => ({ ...f, productId: id, productName: "", total: "" })); return; }
+    setForm((f) => ({ ...f, productId: id, productName: p.name, total: String(p.price * (parseInt(f.quantity) || 1)) }));
+  };
+
+  const handleQtyChange = (qty: string) => {
+    const p = products.find((x) => String(x.id) === form.productId);
+    const total = p ? String(p.price * (parseInt(qty) || 1)) : form.total;
+    setForm((f) => ({ ...f, quantity: qty, total }));
+  };
+
+  const handleCreateOrder = async () => {
+    setCreateErr("");
+    if (!form.productId || !form.customerName || !form.customerPhone || !form.department || !form.city || !form.address || !form.total) {
+      setCreateErr("Completa todos los campos obligatorios."); return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: parseInt(form.productId),
+          productName: form.productName,
+          quantity: parseInt(form.quantity) || 1,
+          customerName: form.customerName,
+          customerPhone: form.customerPhone,
+          customerEmail: form.customerEmail,
+          department: form.department,
+          city: form.city,
+          address: form.address,
+          notes: form.notes,
+          subtotal: parseInt(form.total),
+          shipping: 0,
+          codFee: 0,
+          total: parseInt(form.total),
+        }),
+      });
+      if (!res.ok) { setCreateErr("Error al crear el pedido."); return; }
+      setShowNew(false);
+      setForm(EMPTY_FORM);
+      fetchOrders();
+    } catch {
+      setCreateErr("Error de conexión.");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     let result = orders;
@@ -114,6 +193,16 @@ export default function PedidosPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setShowNew(true); setCreateErr(""); setForm(EMPTY_FORM); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer"
+            style={{ background: "#3B82F6", color: "#fff" }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Nuevo Pedido
+          </button>
           <a
             href="/api/orders/export"
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer"
@@ -360,6 +449,106 @@ export default function PedidosPage() {
           </tbody>
         </table>
       </div>
+
+      {/* New Order Modal */}
+      {showNew && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowNew(false)}
+        >
+          <div
+            className="w-full max-w-lg max-h-[90vh] overflow-auto rounded-2xl animate-scale-in"
+            style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", boxShadow: "0 25px 60px rgba(0,0,0,0.5)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 sticky top-0" style={{ background: "var(--color-surface)", borderBottom: "1px solid var(--color-border)" }}>
+              <h3 className="text-base font-bold" style={{ color: "var(--color-foreground)" }}>Nuevo Pedido Manual</h3>
+              <button onClick={() => setShowNew(false)} className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer" style={{ background: "var(--color-border)", color: "var(--color-muted)" }}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              {/* Producto */}
+              <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-background)", border: "1px solid var(--color-border)" }}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--color-muted)" }}>Producto</p>
+                <select value={form.productId} onChange={(e) => handleProductSelect(e.target.value)} className={inputCls}>
+                  <option value="">Selecciona un producto *</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Cantidad *</label>
+                    <input type="number" min="1" value={form.quantity} onChange={(e) => handleQtyChange(e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Total COP *</label>
+                    <input type="number" value={form.total} onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))} className={inputCls} placeholder="0" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Cliente */}
+              <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-background)", border: "1px solid var(--color-border)" }}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--color-muted)" }}>Cliente</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Nombre completo *</label>
+                    <input value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} className={inputCls} placeholder="Juan Pérez" />
+                  </div>
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Teléfono *</label>
+                    <input value={form.customerPhone} onChange={(e) => setForm((f) => ({ ...f, customerPhone: e.target.value }))} className={inputCls} placeholder="3001234567" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Email (opcional)</label>
+                  <input type="email" value={form.customerEmail} onChange={(e) => setForm((f) => ({ ...f, customerEmail: e.target.value }))} className={inputCls} placeholder="cliente@email.com" />
+                </div>
+              </div>
+
+              {/* Dirección */}
+              <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-background)", border: "1px solid var(--color-border)" }}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--color-muted)" }}>Dirección</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Departamento *</label>
+                    <input value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} className={inputCls} placeholder="Cundinamarca" />
+                  </div>
+                  <div>
+                    <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Ciudad *</label>
+                    <input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} className={inputCls} placeholder="Bogotá" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Dirección completa *</label>
+                  <input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className={inputCls} placeholder="Cra 7 #45-23 Apto 301" />
+                </div>
+                <div>
+                  <label className="text-xs mb-1 block" style={{ color: "var(--color-muted)" }}>Notas (opcional)</label>
+                  <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className={inputCls} placeholder="Instrucciones de entrega..." />
+                </div>
+              </div>
+
+              {createErr && (
+                <p className="text-sm text-center font-medium" style={{ color: "#EF4444" }}>{createErr}</p>
+              )}
+
+              <button
+                onClick={handleCreateOrder}
+                disabled={creating}
+                className="w-full py-3 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer disabled:opacity-50"
+                style={{ background: "#3B82F6", color: "#fff" }}
+              >
+                {creating ? "Creando pedido..." : "Crear Pedido"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Order Detail Modal */}
       {selectedOrder && (
