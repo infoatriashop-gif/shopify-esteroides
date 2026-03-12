@@ -319,8 +319,8 @@ function DropiSettings({
         </button>
         <SaveBtn saved={saved} label="Guardar" onClick={handleSave} />
         {testResult === "testing" && <span className="text-sm" style={{ color: "var(--color-muted)" }}>Probando...</span>}
-        {testResult?.startsWith("success:") && <span className="text-sm" style={{ color: "#10B981" }}>✓ {testResult.split(":")[1]}</span>}
-        {testResult?.startsWith("error:")   && <span className="text-sm" style={{ color: "#EF4444" }}>✗ {testResult.split(":")[1]}</span>}
+        {testResult?.startsWith("success:") && <span className="text-sm" style={{ color: "#10B981" }}>✓ {testResult.slice(8)}</span>}
+        {testResult?.startsWith("error:")   && <span className="text-sm" style={{ color: "#EF4444" }}>✗ {testResult.slice(6)}</span>}
       </div>
       <div className="pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
         <p className="text-xs" style={{ color: "var(--color-muted)" }}>
