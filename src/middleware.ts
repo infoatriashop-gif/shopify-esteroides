@@ -24,7 +24,7 @@ const PROTECTED_PREFIXES = [
 ];
 
 // Public API routes (no auth required)
-const PUBLIC_API_ROUTES = ["/api/checkout", "/api/auth"];
+const PUBLIC_API_ROUTES = ["/api/checkout", "/api/auth", "/api/dropi-debug"];
 
 // Public page routes
 const PUBLIC_ROUTES = ["/login", "/register", "/product", "/", "/forgot-password", "/reset-password"];

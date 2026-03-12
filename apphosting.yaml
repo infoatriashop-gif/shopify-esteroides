@@ -17,3 +17,7 @@ env:
     secret: DROPI_API_KEY
   - variable: DROPI_COUNTRY_CODE
     value: CO
+  - variable: WC_CONSUMER_KEY
+    secret: WC_CONSUMER_KEY
+  - variable: WC_CONSUMER_SECRET
+    secret: WC_CONSUMER_SECRET
