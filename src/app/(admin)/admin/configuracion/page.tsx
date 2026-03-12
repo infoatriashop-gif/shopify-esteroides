@@ -256,27 +256,7 @@ function DropiSettings({
 }) {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [wcCreds, setWcCreds] = useState<{ consumer_key: string; consumer_secret: string } | null>(null);
-  const [generatingCreds, setGeneratingCreds] = useState(false);
   const appOrigin = typeof window !== "undefined" ? window.location.origin : "https://shopify-esteroides--shopify-esteroides-2026.us-central1.hosted.app";
-
-  useEffect(() => {
-    fetch("/api/dropi/wc-credentials")
-      .then(r => r.json())
-      .then(d => { if (d.consumer_key) setWcCreds(d); })
-      .catch(() => {});
-  }, []);
-
-  async function handleGenerateCreds() {
-    setGeneratingCreds(true);
-    try {
-      const res = await fetch("/api/dropi/wc-credentials", { method: "POST" });
-      const data = await res.json();
-      setWcCreds(data);
-    } finally {
-      setGeneratingCreds(false);
-    }
-  }
 
   async function handleTest() {
     if (!values.apiKey) {
@@ -343,46 +323,7 @@ function DropiSettings({
         {testResult?.startsWith("success:") && <span className="text-sm" style={{ color: "#10B981" }}>✓ {testResult.slice(8)}</span>}
         {testResult?.startsWith("error:")   && <span className="text-sm" style={{ color: "#EF4444" }}>✗ {testResult.slice(6)}</span>}
       </div>
-      {/* Credenciales WooCommerce para activar la integración en Dropi */}
-      <div className="p-4 rounded-xl space-y-3" style={{ background: "var(--color-border)" }}>
-        <div>
-          <h4 className="text-sm font-semibold" style={{ color: "var(--color-foreground)" }}>Paso 1 — Activar integración en Dropi</h4>
-          <p className="text-xs mt-1" style={{ color: "var(--color-muted)" }}>
-            Dropi requiere que autentiques tu tienda. Genera las credenciales y pégalas en{" "}
-            <strong>app.dropi.co → Mis Integraciones → editar → tab &quot;Dropi → Woocommerce&quot;</strong>.
-            Luego haz click en &quot;Click aqui para Autenticar Tienda&quot;.
-          </p>
-        </div>
-        {wcCreds ? (
-          <div className="space-y-2">
-            <div>
-              <p className="text-xs font-medium mb-1" style={{ color: "var(--color-muted)" }}>Consumer Key</p>
-              <code className="block text-xs px-3 py-2 rounded-lg font-mono break-all" style={{ background: "var(--color-surface)", color: "var(--color-foreground)" }}>
-                {wcCreds.consumer_key}
-              </code>
-            </div>
-            <div>
-              <p className="text-xs font-medium mb-1" style={{ color: "var(--color-muted)" }}>Consumer Secret</p>
-              <code className="block text-xs px-3 py-2 rounded-lg font-mono break-all" style={{ background: "var(--color-surface)", color: "var(--color-foreground)" }}>
-                {wcCreds.consumer_secret}
-              </code>
-            </div>
-            <p className="text-xs" style={{ color: "var(--color-muted)" }}>
-              URL de la tienda en Dropi:{" "}
-              <code className="font-mono" style={{ color: "var(--color-foreground)" }}>{appOrigin}</code>
-            </p>
-            <button onClick={handleGenerateCreds} disabled={generatingCreds} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer" style={{ background: "var(--color-surface)", color: "var(--color-muted)", border: "1px solid var(--color-border)" }}>
-              Regenerar credenciales
-            </button>
-          </div>
-        ) : (
-          <button onClick={handleGenerateCreds} disabled={generatingCreds} className="px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "#3B82F6", color: "#fff" }}>
-            {generatingCreds ? "Generando..." : "Generar Consumer Key / Secret"}
-          </button>
-        )}
-      </div>
-
-      <div className="pt-2" style={{ borderTop: "1px solid var(--color-border)" }}>
+      <div className="pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
         <p className="text-xs" style={{ color: "var(--color-muted)" }}>
           Webhook URL:{" "}
           <code className="px-2 py-0.5 rounded-md text-xs font-mono" style={{ background: "var(--color-border)", color: "var(--color-foreground)" }}>
