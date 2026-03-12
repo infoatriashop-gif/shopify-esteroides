@@ -41,7 +41,7 @@ type AllSettings = {
 const DEFAULT_SETTINGS: AllSettings = {
   general: { storeName: "Mi Tienda COD", currency: "COP", shippingFee: 12000, codFee: 5000, serverIp: "" },
   domain: { customDomain: "", verified: false },
-  dropi: { enabled: false, environment: "test", apiKey: "", autoSync: true },
+  dropi: { enabled: false, environment: "production", apiKey: "", autoSync: true },
   pixels: { fbPixelId: "", fbAccessToken: "", fbEnabled: false, tiktokPixelId: "", tiktokAccessToken: "", tiktokEnabled: false },
   fraud: { maxOrdersPerIpPerHour: 3, maxOrdersPerPhonePerDay: 5, maxOrdersPerEmailPerDay: 5, blockedUsers: [] },
 };
@@ -297,18 +297,12 @@ function DropiSettings({
           <ToggleSwitch checked={values.enabled} onChange={(v) => onChange({ ...values, enabled: v })} />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls} style={{ color: "var(--color-muted)" }}>Ambiente</label>
-          <select value={values.environment} onChange={(e) => onChange({ ...values, environment: e.target.value })} className={inputCls}>
-            <option value="test">Test (test-api.dropi.co)</option>
-            <option value="production">Produccion (api.dropi.co)</option>
-          </select>
-        </div>
-        <div>
-          <label className={labelCls} style={{ color: "var(--color-muted)" }}>API Key</label>
-          <input type="password" value={values.apiKey} onChange={(e) => onChange({ ...values, apiKey: e.target.value })} placeholder="Token del dashboard de Dropi" className={inputCls} />
-        </div>
+      <div>
+        <label className={labelCls} style={{ color: "var(--color-muted)" }}>Integration Key</label>
+        <p className="text-xs mb-2" style={{ color: "var(--color-muted)" }}>
+          Obtenla en <strong>app.dropi.co → Mis Integraciones → (icono ojo)</strong>
+        </p>
+        <input type="password" value={values.apiKey} onChange={(e) => onChange({ ...values, apiKey: e.target.value.trim() })} placeholder="Pega aqui tu Integration Key de Dropi" className={inputCls} />
       </div>
       <label className="flex items-center gap-2 cursor-pointer">
         <ToggleSwitch checked={values.autoSync} onChange={(v) => onChange({ ...values, autoSync: v })} />
