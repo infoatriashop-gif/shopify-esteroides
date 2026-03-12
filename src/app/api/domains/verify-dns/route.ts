@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Dominio requerido" }, { status: 400 });
   }
 
-  const record = getDomain(domain);
+  const record = await getDomain(domain);
   if (!record) {
     return NextResponse.json({ error: "Dominio no encontrado" }, { status: 404 });
   }
@@ -25,18 +25,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Dominio requerido" }, { status: 400 });
   }
 
-  // Clean domain
   const cleanDomain = domain.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 
   if (action === "add") {
-    const record = addDomain(cleanDomain);
+    const record = await addDomain(cleanDomain);
     return NextResponse.json(record);
   }
 
   if (action === "verify") {
     try {
-      const appHost = req.headers.get("host") || "";
-      const record = await verifyDomain(cleanDomain, appHost);
+      const record = await verifyDomain(cleanDomain);
       return NextResponse.json(record);
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 400 });
@@ -44,7 +42,7 @@ export async function POST(req: Request) {
   }
 
   if (action === "remove") {
-    removeDomain(cleanDomain);
+    await removeDomain(cleanDomain);
     return NextResponse.json({ success: true });
   }
 

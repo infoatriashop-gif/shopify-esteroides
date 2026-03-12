@@ -2,6 +2,8 @@ import dns from "dns";
 import crypto from "crypto";
 import { readStore, writeStore } from "./store";
 
+export const FIREBASE_CNAME_TARGET = "shopify-esteroides--shopify-esteroides-2026.us-central1.hosted.app";
+
 export type DnsStatus = "pending" | "txt_verified" | "active" | "error";
 
 export type DomainRecord = {
@@ -22,7 +24,7 @@ async function saveDomainRecords(records: Record<string, DomainRecord>): Promise
 }
 
 export function generateTxtToken(): string {
-  return `dropi-verify=${crypto.randomBytes(12).toString("hex")}`;
+  return `shopify-verify=${crypto.randomBytes(12).toString("hex")}`;
 }
 
 export async function addDomain(domain: string): Promise<DomainRecord> {
@@ -51,15 +53,10 @@ export async function removeDomain(domain: string): Promise<void> {
   await saveDomainRecords(records);
 }
 
-// Resolve DNS records using Node.js dns module
 export async function resolveTxt(domain: string): Promise<string[]> {
   return new Promise((resolve) => {
     dns.resolveTxt(domain, (err, records) => {
-      if (err) {
-        resolve([]);
-        return;
-      }
-      // TXT records come as arrays of strings per record
+      if (err) { resolve([]); return; }
       resolve(records.map((r) => r.join("")));
     });
   });
@@ -68,10 +65,7 @@ export async function resolveTxt(domain: string): Promise<string[]> {
 export async function resolveCname(domain: string): Promise<string[]> {
   return new Promise((resolve) => {
     dns.resolveCname(domain, (err, records) => {
-      if (err) {
-        resolve([]);
-        return;
-      }
+      if (err) { resolve([]); return; }
       resolve(records);
     });
   });
@@ -80,56 +74,54 @@ export async function resolveCname(domain: string): Promise<string[]> {
 export async function resolveA(domain: string): Promise<string[]> {
   return new Promise((resolve) => {
     dns.resolve4(domain, (err, addresses) => {
-      if (err) {
-        resolve([]);
-        return;
-      }
+      if (err) { resolve([]); return; }
       resolve(addresses);
     });
   });
 }
 
-export async function verifyDomain(
-  domain: string,
-  expectedCname?: string,
-  expectedIp?: string
-): Promise<DomainRecord> {
+/**
+ * Verifica el dominio en dos pasos:
+ * 1. TXT: confirma propiedad del dominio
+ * 2. CNAME: confirma que apunta a Firebase App Hosting
+ */
+export async function verifyDomain(domain: string): Promise<DomainRecord> {
   const records = await getDomainRecords();
   const record = records[domain];
 
-  if (!record) {
-    throw new Error("Dominio no registrado");
-  }
+  if (!record) throw new Error("Dominio no registrado");
 
-  // Step 1: Verify TXT record
+  // Paso 1: Verificar TXT de propiedad
   if (record.status === "pending") {
     const txtRecords = await resolveTxt(domain);
     const found = txtRecords.some((txt) => txt === record.txtToken);
 
-    if (found) {
-      record.status = "txt_verified";
-      record.verifiedAt = new Date().toISOString();
-    } else {
-      record.errorMessage = "Registro TXT no encontrado. Agrega el registro TXT y espera la propagacion DNS.";
+    if (!found) {
+      record.errorMessage = `Registro TXT no encontrado en ${domain}. Asegurate de haberlo agregado y espera la propagacion DNS (5-30 min).`;
       records[domain] = record;
       await saveDomainRecords(records);
       return record;
     }
+
+    record.status = "txt_verified";
+    record.verifiedAt = new Date().toISOString();
   }
 
-  // Step 2: Verify CNAME or A record
+  // Paso 2: Verificar CNAME apuntando a Firebase
   if (record.status === "txt_verified") {
     const cnameRecords = await resolveCname(domain);
-    const aRecords = await resolveA(domain);
+    const cnameOk = cnameRecords.some(
+      (r) => r.replace(/\.$/, "").toLowerCase() === FIREBASE_CNAME_TARGET.toLowerCase()
+    );
 
-    const cnameOk = expectedCname && cnameRecords.some((r) => r.includes(expectedCname));
-    const aOk = expectedIp && aRecords.includes(expectedIp);
-
-    if (cnameOk || aOk) {
+    if (cnameOk) {
       record.status = "active";
       record.errorMessage = undefined;
     } else {
-      record.errorMessage = "TXT verificado, pero falta configurar CNAME o registro A apuntando al servidor.";
+      const found = cnameRecords.length > 0
+        ? `Encontrado CNAME: ${cnameRecords[0]}`
+        : "No se encontro ningun registro CNAME";
+      record.errorMessage = `CNAME incorrecto. ${found}. Debe apuntar exactamente a: ${FIREBASE_CNAME_TARGET}`;
     }
   }
 

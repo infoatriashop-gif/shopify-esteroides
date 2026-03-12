@@ -149,7 +149,6 @@ export default function ConfiguracionPage() {
         {activeTab === "dominio" && (
           <DomainSettings
             values={settings.domain}
-            serverIp={settings.general.serverIp}
             onChange={(v) => setSettings({ ...settings, domain: v })}
             onSave={() => saveNamespace("domain", settings.domain)}
           />
@@ -586,26 +585,28 @@ function DnsRecord({
   );
 }
 
+const FIREBASE_CNAME = "shopify-esteroides--shopify-esteroides-2026.us-central1.hosted.app";
+
 function DomainSettings({
   values,
-  serverIp,
   onChange,
   onSave,
 }: {
   values: AllSettings["domain"];
-  serverIp: string;
   onChange: (v: AllSettings["domain"]) => void;
   onSave: () => void;
 }) {
   const [saved, setSaved] = useState(false);
   const [checking, setChecking] = useState(false);
   const [dnsStatus, setDnsStatus] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [txtToken, setTxtToken] = useState<string | null>(null);
   const [activeProvider, setActiveProvider] = useState<"hostinger" | "cloudflare" | "godaddy" | "namecheap">("hostinger");
 
-  const appDomain = typeof window !== "undefined" ? window.location.host : "tu-app.com";
-  const ip = serverIp || "IP_NO_CONFIGURADA";
-  const subdomain = values.customDomain ? values.customDomain.split(".").slice(0, -2).join(".") || "www" : "www";
+  const isSubdomain = values.customDomain ? values.customDomain.split(".").length > 2 : true;
+  const cnameHost = isSubdomain
+    ? values.customDomain.split(".").slice(0, -2).join(".") || "www"
+    : "@";
 
   async function handleSave() {
     await onSave();
@@ -632,6 +633,7 @@ function DomainSettings({
   async function handleVerify() {
     if (!values.customDomain) return;
     setChecking(true);
+    setErrorMsg(null);
     try {
       const res = await fetch("/api/domains/verify-dns", {
         method: "POST",
@@ -640,11 +642,13 @@ function DomainSettings({
       });
       const data = await res.json();
       setDnsStatus(data.status);
+      if (data.errorMessage) setErrorMsg(data.errorMessage);
       if (data.status === "active") {
         onChange({ ...values, verified: true });
       }
     } catch {
       setDnsStatus("error");
+      setErrorMsg("Error de red al verificar. Intenta de nuevo.");
     } finally {
       setChecking(false);
     }
@@ -652,10 +656,10 @@ function DomainSettings({
 
   const statusBadge = (status: string | null) => {
     const map: Record<string, { label: string; cls: string }> = {
-      pending: { label: "Pendiente", cls: "bg-yellow-100 text-yellow-700" },
-      txt_verified: { label: "TXT Verificado — ahora agrega el registro A", cls: "bg-blue-100 text-blue-700" },
-      active: { label: "Activo — Dominio conectado", cls: "bg-green-100 text-green-700" },
-      error: { label: "Error — verifica los registros DNS", cls: "bg-red-100 text-red-700" },
+      pending: { label: "Pendiente — agrega los registros DNS", cls: "bg-yellow-100 text-yellow-700" },
+      txt_verified: { label: "TXT verificado — ahora agrega el CNAME", cls: "bg-blue-100 text-blue-700" },
+      active: { label: "Activo — Dominio conectado correctamente", cls: "bg-green-100 text-green-700" },
+      error: { label: "Error en la verificacion", cls: "bg-red-100 text-red-700" },
     };
     const s = map[status || ""] || map.pending;
     return <span className={`text-xs px-2 py-1 rounded font-medium ${s.cls}`}>{s.label}</span>;
@@ -673,29 +677,33 @@ function DomainSettings({
       <div>
         <h3 className="text-lg font-semibold">Dominio Personalizado</h3>
         <p className="text-sm text-gray-500 mt-1">
-          Conecta tu dominio para que tus paginas de checkout luzcan profesionales con tu marca.
+          Conecta tu propio dominio para que tus paginas de checkout luzcan profesionales con tu marca.
         </p>
       </div>
 
-      {/* Server IP warning */}
-      {!serverIp && (
-        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 4a8 8 0 100 16 8 8 0 000-16z" />
-          </svg>
-          <div>
-            <p className="text-sm font-medium text-amber-800">IP del servidor no configurada</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              Ve al tab <strong>General</strong> y agrega la IP de tu servidor VPS antes de configurar el dominio.
-              Sin la IP no podras crear los registros DNS correctamente.
-            </p>
-          </div>
+      {/* Info Firebase hosting */}
+      <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+        <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
+        </svg>
+        <div>
+          <p className="text-sm font-medium text-blue-800">Tu app esta en Firebase App Hosting</p>
+          <p className="text-xs text-blue-700 mt-0.5">
+            Para conectar tu dominio debes apuntar un registro <strong>CNAME</strong> a Firebase.
+            No se necesita IP ni servidor VPS.
+          </p>
         </div>
-      )}
+      </div>
 
       {/* Domain input */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Tu dominio personalizado</label>
+        <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-foreground)" }}>
+          Tu dominio personalizado
+        </label>
+        <p className="text-xs mb-2" style={{ color: "var(--color-muted)" }}>
+          Usa un subdominio como <strong>tienda.tudominio.com</strong> o <strong>www.tudominio.com</strong>.
+          Los dominios raiz (@) requieren soporte de CNAME flattening (Cloudflare).
+        </p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -704,6 +712,7 @@ function DomainSettings({
               onChange({ ...values, customDomain: e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ""), verified: false });
               setDnsStatus(null);
               setTxtToken(null);
+              setErrorMsg(null);
             }}
             placeholder="tienda.tudominio.com"
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
@@ -712,47 +721,60 @@ function DomainSettings({
             <button
               onClick={handleAddDomain}
               disabled={!values.customDomain}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
-              Iniciar configuracion
+              Generar token
             </button>
           ) : (
             <button
               onClick={handleVerify}
               disabled={!values.customDomain || checking}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
               {checking ? "Verificando..." : "Verificar DNS"}
             </button>
           )}
         </div>
+
+        {/* Status */}
         {values.verified && (
-          <div className="mt-2 flex items-center gap-2 text-green-600 text-sm">
+          <div className="mt-3 flex items-center gap-2 text-green-600 text-sm font-medium">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             Dominio verificado y activo
           </div>
         )}
-        {dnsStatus && !values.verified && <div className="mt-2">{statusBadge(dnsStatus)}</div>}
+        {dnsStatus && !values.verified && (
+          <div className="mt-3 space-y-2">
+            {statusBadge(dnsStatus)}
+            {errorMsg && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 font-mono">
+                {errorMsg}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* DNS Guide — always visible once a domain is entered */}
+      {/* DNS Guide — visible una vez generado el token */}
       {values.customDomain && txtToken && (
         <div className="border border-blue-200 bg-blue-50 rounded-xl p-5 space-y-4">
           <div>
-            <h4 className="font-semibold text-blue-900">Registros DNS requeridos</h4>
+            <h4 className="font-semibold text-blue-900">Registros DNS que debes agregar</h4>
             <p className="text-sm text-blue-700 mt-1">
-              Agrega estos 3 registros en tu proveedor en el orden indicado. Luego haz click en &quot;Verificar DNS&quot;.
+              Agrega estos <strong>2 registros</strong> en tu proveedor de dominios en el orden indicado.
+              Luego haz click en <strong>&quot;Verificar DNS&quot;</strong>.
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
+            {/* PASO 1 — TXT */}
             <DnsRecord
               step="1"
-              badge="PASO 1 — TXT"
+              badge="PASO 1 — TXT (verificacion de propiedad)"
               badgeCls="bg-purple-100 text-purple-700"
-              subtitle="Verificacion de propiedad del dominio"
+              subtitle="Demuestra que eres el dueno del dominio"
               fields={[
                 { label: "Tipo", value: "TXT" },
                 { label: "Nombre / Host", value: "@" },
@@ -760,49 +782,25 @@ function DomainSettings({
                 { label: "TTL", value: "3600" },
               ]}
             />
+            {/* PASO 2 — CNAME */}
             <DnsRecord
               step="2"
-              badge="PASO 2 — A (dominio raiz)"
+              badge="PASO 2 — CNAME (apuntar a Firebase)"
               badgeCls="bg-blue-100 text-blue-700"
-              subtitle="Apunta @ a tu servidor"
+              subtitle="Dirige el trafico de tu dominio a tu tienda"
               fields={[
-                { label: "Tipo", value: "A" },
-                { label: "Nombre / Host", value: "@" },
-                { label: "Valor / IP", value: ip, highlight: true },
+                { label: "Tipo", value: "CNAME" },
+                { label: "Nombre / Host", value: cnameHost, highlight: true },
+                { label: "Apunta a / Valor", value: FIREBASE_CNAME, highlight: true },
                 { label: "TTL", value: "3600" },
               ]}
             />
-            <DnsRecord
-              step="3"
-              badge="PASO 3 — A (www)"
-              badgeCls="bg-blue-100 text-blue-700"
-              subtitle="Apunta www a tu servidor"
-              fields={[
-                { label: "Tipo", value: "A" },
-                { label: "Nombre / Host", value: "www" },
-                { label: "Valor / IP", value: ip, highlight: true },
-                { label: "TTL", value: "3600" },
-              ]}
-            />
-            {subdomain && subdomain !== "www" && (
-              <DnsRecord
-                step="4"
-                badge="PASO 4 — CNAME (subdominio)"
-                badgeCls="bg-teal-100 text-teal-700"
-                subtitle={`Solo si usas subdominio: ${subdomain}`}
-                fields={[
-                  { label: "Tipo", value: "CNAME" },
-                  { label: "Nombre / Host", value: subdomain },
-                  { label: "Apunta a", value: appDomain, highlight: true },
-                  { label: "TTL", value: "3600" },
-                ]}
-              />
-            )}
           </div>
 
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
-            <strong>Propagacion DNS:</strong> Los cambios pueden tardar entre 5 minutos y 48 horas.
-            Hostinger y Cloudflare suelen propagar en minutos.
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
+            <p><strong>Tiempo de propagacion:</strong> Entre 5 minutos y 48 horas segun tu proveedor.</p>
+            <p><strong>Hostinger y Cloudflare</strong> suelen propagar en menos de 30 minutos.</p>
+            <p>Puedes verificar la propagacion en <strong>dnschecker.org</strong> buscando tu dominio con tipo CNAME.</p>
           </div>
         </div>
       )}
@@ -843,48 +841,11 @@ function DomainSettings({
               </div>
 
               {[
-                {
-                  n: 1,
-                  title: "Accede a tu panel de Hostinger",
-                  desc: "Ve a hpanel.hostinger.com e inicia sesion con tu cuenta.",
-                  tip: null,
-                },
-                {
-                  n: 2,
-                  title: "Ve a la seccion Dominios",
-                  desc: 'En el menu principal, haz click en "Dominios" para ver todos tus dominios registrados.',
-                  tip: null,
-                },
-                {
-                  n: 3,
-                  title: "Selecciona tu dominio",
-                  desc: 'Haz click en el dominio que quieres conectar. Luego haz click en "DNS / Servidores de nombres" en el menu lateral izquierdo.',
-                  tip: null,
-                },
-                {
-                  n: 4,
-                  title: 'Agrega el registro TXT (verificacion)',
-                  desc: 'En la seccion "Administrar registros DNS", haz click en "Agregar registro". Selecciona tipo TXT, en Nombre escribe @ y en Contenido pega el token de verificacion que aparece arriba.',
-                  tip: 'Si no ves el campo "Nombre", busca "Host" o "Subdominio".',
-                },
-                {
-                  n: 5,
-                  title: "Agrega los registros A",
-                  desc: `Agrega dos registros tipo A: uno con Host @ y otro con Host www. En ambos, el valor es la IP de tu servidor: ${ip === "IP_NO_CONFIGURADA" ? "[configurar IP en tab General]" : ip}`,
-                  tip: "Hostinger puede ya tener un registro A con la IP por defecto. Edita ese registro en lugar de crear uno nuevo.",
-                },
-                {
-                  n: 6,
-                  title: "Elimina registros conflictivos",
-                  desc: 'Si ya existia un registro CNAME para @ o www apuntando a Hostinger, eliminalo. Los registros A y CNAME no pueden coexistir para el mismo host.',
-                  tip: null,
-                },
-                {
-                  n: 7,
-                  title: "Guarda y espera la propagacion",
-                  desc: 'Haz click en "Guardar" en Hostinger. Espera entre 5 y 30 minutos. Luego regresa aqui y haz click en "Verificar DNS".',
-                  tip: "Puedes verificar la propagacion en https://dnschecker.org buscando tu dominio.",
-                },
+                { n: 1, title: "Accede a hpanel.hostinger.com", desc: "Inicia sesion con tu cuenta.", tip: null },
+                { n: 2, title: "Ve a Dominios → DNS", desc: 'Haz click en "Dominios", selecciona tu dominio y luego "DNS / Servidores de nombres".', tip: null },
+                { n: 3, title: "Agrega el registro TXT", desc: 'Haz click en "Agregar registro". Tipo: TXT, Nombre: @, Contenido: pega el token de verificacion. Guarda.', tip: 'Si no ves "Nombre", busca "Host" o "Subdominio".' },
+                { n: 4, title: "Agrega el registro CNAME", desc: `Haz click en "Agregar registro". Tipo: CNAME, Nombre: ${cnameHost || "www"}, Apunta a: ${FIREBASE_CNAME}. Guarda.`, tip: "Si ya existe un CNAME para ese host, editalo en lugar de crear uno nuevo." },
+                { n: 5, title: "Espera y verifica", desc: 'Hostinger suele propagar en 5-30 minutos. Regresa aqui y haz click en "Verificar DNS".', tip: "Verifica la propagacion en dnschecker.org buscando tu dominio con tipo CNAME." },
               ].map((step) => (
                 <div key={step.n} className="flex gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-violet-100 text-violet-700 rounded-full flex items-center justify-center text-xs font-bold">
@@ -917,11 +878,11 @@ function DomainSettings({
               </div>
 
               {[
-                { n: 1, title: "Accede a dash.cloudflare.com", desc: "Inicia sesion y selecciona tu dominio desde la lista de sitios." },
-                { n: 2, title: 'Ve a "DNS" en el menu lateral', desc: "Encontraras la tabla de registros DNS de tu dominio." },
-                { n: 3, title: "Agrega el registro TXT", desc: 'Haz click en "Add record". Tipo: TXT, Name: @, Content: pega el token de verificacion. Haz click en Save.' },
-                { n: 4, title: "Agrega los registros A", desc: `Agrega 2 registros A: Name "@" → IP: ${ip}, Name "www" → IP: ${ip}. Desactiva el proxy (nube naranja → gris) para estos registros durante la verificacion inicial.` },
-                { n: 5, title: "Verifica la propagacion", desc: 'Cloudflare propaga en 1-5 minutos. Regresa aqui y haz click en "Verificar DNS".' },
+                { n: 1, title: "Accede a dash.cloudflare.com", desc: "Inicia sesion y selecciona tu dominio." },
+                { n: 2, title: 'Ve a "DNS" en el menu lateral', desc: "Encontraras la tabla de registros DNS." },
+                { n: 3, title: "Agrega el registro TXT", desc: 'Haz click en "Add record". Tipo: TXT, Name: @, Content: pega el token de verificacion. Save.' },
+                { n: 4, title: "Agrega el registro CNAME", desc: `Haz click en "Add record". Tipo: CNAME, Name: ${cnameHost || "www"}, Target: ${FIREBASE_CNAME}. Desactiva el proxy (nube naranja → gris). Save.` },
+                { n: 5, title: "Verifica", desc: 'Cloudflare propaga en 1-5 minutos. Regresa aqui y haz click en "Verificar DNS".' },
               ].map((step) => (
                 <div key={step.n} className="flex gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-bold">
@@ -949,11 +910,11 @@ function DomainSettings({
               </div>
 
               {[
-                { n: 1, title: 'Ve a "Mis Productos" en GoDaddy', desc: "Inicia sesion en godaddy.com y haz click en tu nombre de usuario → Mis Productos." },
-                { n: 2, title: "Administrar DNS", desc: 'Haz click en el dominio y selecciona "DNS" o "Administrar DNS" en el menu desplegable.' },
+                { n: 1, title: 'Accede a godaddy.com → Mis Productos', desc: "Inicia sesion y ve a tu nombre de usuario → Mis Productos." },
+                { n: 2, title: "Administrar DNS", desc: 'Haz click en el dominio y selecciona "DNS" o "Administrar DNS".' },
                 { n: 3, title: "Agrega el TXT de verificacion", desc: 'Haz click en "Agregar". Tipo: TXT, Nombre: @, Valor: pega el token. TTL: 1 hora. Guarda.' },
-                { n: 4, title: "Agrega los registros A", desc: `Agrega 2 registros A. Nombre: @ e IP ${ip}. Nombre: www e IP ${ip}. Si ya existe un A record para @, editalo en lugar de agregar uno nuevo.` },
-                { n: 5, title: "Espera y verifica", desc: 'GoDaddy puede tardar 30 min - 24 hrs. Puedes monitorear en dnschecker.org. Luego regresa aqui y haz click en "Verificar DNS".' },
+                { n: 4, title: "Agrega el CNAME", desc: `Haz click en "Agregar". Tipo: CNAME, Nombre: ${cnameHost || "www"}, Valor: ${FIREBASE_CNAME}. Guarda.` },
+                { n: 5, title: "Espera y verifica", desc: 'GoDaddy puede tardar 30 min - 24 hrs. Monitorea en dnschecker.org con tipo CNAME. Luego haz click en "Verificar DNS".' },
               ].map((step) => (
                 <div key={step.n} className="flex gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">
@@ -981,12 +942,12 @@ function DomainSettings({
               </div>
 
               {[
-                { n: 1, title: 'Ve a "Domain List"', desc: "Inicia sesion en namecheap.com y haz click en Account → Dashboard → Domain List." },
-                { n: 2, title: 'Haz click en "Manage"', desc: "Haz click en el boton Manage del dominio que quieres configurar." },
-                { n: 3, title: 'Ve a "Advanced DNS"', desc: 'En el menu del dominio, selecciona la pestaña "Advanced DNS".' },
-                { n: 4, title: "Agrega el registro TXT", desc: 'Haz click en "Add New Record". Type: TXT, Host: @, Value: pega el token de verificacion. TTL: Automatic. Save.' },
-                { n: 5, title: "Agrega los registros A", desc: `Agrega 2 registros A. Host: @ → Value: ${ip}. Host: www → Value: ${ip}. Elimina cualquier CNAME para @ o www que pueda existir.` },
-                { n: 6, title: "Verifica", desc: 'Espera 15-30 minutos. Regresa aqui y haz click en "Verificar DNS". Si falla, espera mas tiempo.' },
+                { n: 1, title: 'Ve a "Domain List"', desc: "Inicia sesion en namecheap.com y ve a Account → Dashboard → Domain List." },
+                { n: 2, title: 'Haz click en "Manage"', desc: "Haz click en el boton Manage del dominio." },
+                { n: 3, title: 'Ve a "Advanced DNS"', desc: 'Selecciona la pestaña "Advanced DNS".' },
+                { n: 4, title: "Agrega el TXT", desc: 'Haz click en "Add New Record". Type: TXT, Host: @, Value: pega el token. TTL: Automatic. Save.' },
+                { n: 5, title: "Agrega el CNAME", desc: `Haz click en "Add New Record". Type: CNAME, Host: ${cnameHost || "www"}, Value: ${FIREBASE_CNAME}. Save.` },
+                { n: 6, title: "Verifica", desc: 'Espera 15-30 minutos. Verifica en dnschecker.org con tipo CNAME. Luego haz click en "Verificar DNS".' },
               ].map((step) => (
                 <div key={step.n} className="flex gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-red-100 text-red-700 rounded-full flex items-center justify-center text-xs font-bold">
@@ -1010,20 +971,20 @@ function DomainSettings({
         </summary>
         <div className="px-5 pb-4 space-y-3 text-sm">
           <div className="border-l-4 border-red-400 pl-3">
-            <p className="font-medium text-red-700">Error: DNS no verificado despues de 1 hora</p>
-            <p className="text-xs text-gray-600 mt-0.5">Verifica que el valor TXT sea exactamente igual (sin espacios adicionales). Usa dnschecker.org para confirmar la propagacion.</p>
+            <p className="font-medium text-red-700">TXT no verificado despues de 1 hora</p>
+            <p className="text-xs text-gray-600 mt-0.5">Verifica que el valor TXT sea exactamente igual al token (sin espacios). Comprueba en dnschecker.org buscando tu dominio con tipo TXT.</p>
           </div>
           <div className="border-l-4 border-amber-400 pl-3">
-            <p className="font-medium text-amber-700">El dominio carga la pagina de Hostinger en lugar de tu tienda</p>
-            <p className="text-xs text-gray-600 mt-0.5">Los registros A aun apuntan a la IP de Hostinger. Edita los registros A @ y www y cambia la IP a la de tu servidor VPS.</p>
+            <p className="font-medium text-amber-700">CNAME no verificado aunque ya lo agregue</p>
+            <p className="text-xs text-gray-600 mt-0.5">Confirma que el CNAME apunta exactamente a: <code className="bg-amber-100 px-1 rounded">{FIREBASE_CNAME}</code>. Verifica en dnschecker.org con tipo CNAME. Si usas Cloudflare, asegurate de desactivar el proxy (nube gris).</p>
           </div>
           <div className="border-l-4 border-blue-400 pl-3">
-            <p className="font-medium text-blue-700">Error: CNAME y A record conflicto</p>
-            <p className="text-xs text-gray-600 mt-0.5">No puedes tener un CNAME y un A record para el mismo host. Elimina el CNAME para @ y usa solo el registro A.</p>
+            <p className="font-medium text-blue-700">El dominio no carga mi tienda</p>
+            <p className="text-xs text-gray-600 mt-0.5">El CNAME puede estar propagado pero Firebase necesita que registres el dominio personalizado en la consola de Firebase App Hosting. Ve a console.firebase.google.com → App Hosting → tu backend → Dominios → Agregar dominio personalizado.</p>
           </div>
           <div className="border-l-4 border-green-400 pl-3">
-            <p className="font-medium text-green-700">SSL/HTTPS no funciona despues de conectar el dominio</p>
-            <p className="text-xs text-gray-600 mt-0.5">El certificado SSL se genera automaticamente. Puede tardar hasta 24 horas. Si usas Cloudflare, activa el modo Flexible SSL temporalmente.</p>
+            <p className="font-medium text-green-700">SSL/HTTPS no funciona</p>
+            <p className="text-xs text-gray-600 mt-0.5">Firebase genera el certificado SSL automaticamente al agregar el dominio en la consola. Puede tardar hasta 24 horas. Si usas Cloudflare con proxy activo, usa modo SSL &quot;Full&quot;.</p>
           </div>
         </div>
       </details>
