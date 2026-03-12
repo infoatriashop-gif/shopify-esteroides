@@ -258,22 +258,18 @@ function DropiSettings({
   const [saved, setSaved] = useState(false);
   const appOrigin = typeof window !== "undefined" ? window.location.origin : "https://shopify-esteroides--shopify-esteroides-2026.us-central1.hosted.app";
 
-  async function handleTest() {
-    if (!values.apiKey) {
-      setTestResult("error:Ingresa tu API Key de Dropi");
-      return;
-    }
+  async function handleTestWc() {
     setTestResult("testing");
     try {
-      const res = await fetch("/api/dropi/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: values.apiKey, environment: values.environment }),
-      });
-      const data = await res.json();
-      setTestResult(data.success ? `success:${data.message}` : `error:${data.message}`);
+      const res = await fetch(`${appOrigin}/wp-json/wc/v3/orders?consumer_key=ck_9189e75fbf4b9157fc679abbae55fc7d4cd01b53&consumer_secret=cs_bb0d41fa6ab069cc8ff7f33856901ccfed1d8a42&per_page=1`);
+      if (res.ok) {
+        const orders = await res.json();
+        setTestResult(`success:Endpoint WooCommerce OK. ${Array.isArray(orders) ? orders.length : 0} pedido(s) disponibles para Dropi.`);
+      } else {
+        setTestResult("error:Error al conectar con el endpoint WooCommerce.");
+      }
     } catch {
-      setTestResult("error:Error de conexion");
+      setTestResult("error:Error de conexion al endpoint.");
     }
   }
 
@@ -292,44 +288,79 @@ function DropiSettings({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className={sectionTitle} style={{ color: "var(--color-foreground)" }}>Integracion Dropi</h3>
+        <h3 className={sectionTitle} style={{ color: "var(--color-foreground)" }}>Integracion Dropi (WooCommerce)</h3>
         <div className="flex items-center gap-2">
           <span className="text-sm" style={{ color: "var(--color-muted)" }}>Habilitado</span>
           <ToggleSwitch checked={values.enabled} onChange={(v) => onChange({ ...values, enabled: v })} />
         </div>
       </div>
-      <div>
-        <label className={labelCls} style={{ color: "var(--color-muted)" }}>Integration Key</label>
-        <p className="text-xs mb-2" style={{ color: "var(--color-muted)" }}>
-          Obtenla en <strong>app.dropi.co → Mis Integraciones → (icono ojo)</strong>
-        </p>
-        <input type="password" value={values.apiKey} onChange={(e) => onChange({ ...values, apiKey: e.target.value.trim() })} placeholder="Pega aqui tu Integration Key de Dropi" className={inputCls} />
+
+      {/* Estado de la integración */}
+      <div className="rounded-xl p-4" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
+        <div className="flex items-start gap-3">
+          <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="#10B981" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "#10B981" }}>Integracion WooCommerce activa</p>
+            <p className="text-xs mt-1" style={{ color: "var(--color-muted)" }}>
+              Dropi lee los pedidos de tu tienda automaticamente. Cuando creas un pedido en Admin → Pedidos, Dropi lo recoge y genera la guia de envio.
+            </p>
+          </div>
+        </div>
       </div>
+
+      {/* Cómo funciona */}
+      <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--color-background)", border: "1px solid var(--color-border)" }}>
+        <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--color-muted)" }}>Como funciona</p>
+        <div className="space-y-2">
+          {[
+            "Importa productos de Dropi en Admin → Productos → Importar de Dropi",
+            "Los pedidos del checkout se crean con el ID de producto Dropi vinculado",
+            "Dropi lee los pedidos desde tu tienda via WooCommerce REST API",
+            "Dropi actualiza el estado del pedido (guia, envio, entrega) automaticamente",
+          ].map((step, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className="text-xs font-bold mt-0.5 flex-shrink-0" style={{ color: "#3B82F6" }}>{i + 1}.</span>
+              <span className="text-xs" style={{ color: "var(--color-foreground)" }}>{step}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Auto sync toggle */}
       <label className="flex items-center gap-2 cursor-pointer">
         <ToggleSwitch checked={values.autoSync} onChange={(v) => onChange({ ...values, autoSync: v })} />
         <span className="text-sm" style={{ color: "var(--color-foreground)" }}>Sincronizar pedidos automaticamente al crear</span>
       </label>
+
+      {/* Test + Save */}
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          onClick={handleTest}
+          onClick={handleTestWc}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer"
           style={{ background: "var(--color-border)", color: "var(--color-foreground)" }}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Probar Conexion
+          Verificar Endpoint
         </button>
         <SaveBtn saved={saved} label="Guardar" onClick={handleSave} />
-        {testResult === "testing" && <span className="text-sm" style={{ color: "var(--color-muted)" }}>Probando...</span>}
+        {testResult === "testing" && <span className="text-sm" style={{ color: "var(--color-muted)" }}>Verificando...</span>}
         {testResult?.startsWith("success:") && <span className="text-sm" style={{ color: "#10B981" }}>✓ {testResult.slice(8)}</span>}
         {testResult?.startsWith("error:")   && <span className="text-sm" style={{ color: "#EF4444" }}>✗ {testResult.slice(6)}</span>}
       </div>
-      <div className="pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
-        <p className="text-xs" style={{ color: "var(--color-muted)" }}>
-          Webhook URL:{" "}
-          <code className="px-2 py-0.5 rounded-md text-xs font-mono" style={{ background: "var(--color-border)", color: "var(--color-foreground)" }}>
-            {appOrigin}/api/dropi/webhook
-          </code>
-        </p>
+
+      {/* Endpoints técnicos */}
+      <div className="pt-4 space-y-2" style={{ borderTop: "1px solid var(--color-border)" }}>
+        <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--color-muted)" }}>Endpoints</p>
+        {[
+          { label: "Orders API", url: `${appOrigin}/wp-json/wc/v3/orders` },
+          { label: "Webhook", url: `${appOrigin}/api/dropi/webhook` },
+          { label: "OAuth", url: `${appOrigin}/wc-auth/v1/authorize` },
+        ].map((ep) => (
+          <div key={ep.label} className="flex items-center gap-2">
+            <span className="text-xs flex-shrink-0 w-20" style={{ color: "var(--color-muted)" }}>{ep.label}:</span>
+            <code className="px-2 py-0.5 rounded-md text-xs font-mono truncate" style={{ background: "var(--color-border)", color: "var(--color-foreground)" }}>{ep.url}</code>
+          </div>
+        ))}
       </div>
     </div>
   );
